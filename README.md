@@ -14,6 +14,8 @@
   <img alt="License AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-6b21a8?style=for-the-badge">
 </p>
 
+<p align="center"><b>Install on Mac: open Terminal and paste <code>curl -fsSL https://raw.githubusercontent.com/Vanshworkff/jaromes-lite-mac/main/install.sh | bash</code></b></p>
+
 <p align="center">
   🍎 On a Mac? → <a href="https://github.com/Vanshworkff/jaromes-lite-mac">jaromes-lite-mac</a>
   &nbsp;·&nbsp;
@@ -125,45 +127,52 @@ flowchart TD
 
 **You need:** A Mac with macOS 13.5 or newer (Apple silicon or Intel), and an AI account to give your buddy a brain: a **Claude** plan, a **ChatGPT** plan, or an API key from Anthropic, OpenAI or Google. The setup guide walks you through it.
 
-### 1. Download 📦
+### 1. Install it with one line ✨ (easiest)
 
-Go to **[Releases](../../releases)** and download the file that matches your Mac:
-
-| Your Mac | Download |
-|---|---|
-| M1, M2, M3, M4… (Apple silicon) | `Jaromes-Lite_…_mac-apple-silicon.dmg` |
-| Older Mac with an Intel chip | `Jaromes-Lite_…_mac-intel.dmg` |
-
-> 🤔 Not sure which one? Click the  Apple menu → **About This Mac**. If it says *Chip: Apple M…*, pick Apple silicon.
-
-### 2. Drag it in 🖱️
-
-```
-   ┌──────────────────────────────────────────┐
-   │                                          │
-   │    ( ◕‿◕ )      ───────▶     📁           │
-   │   Jaromes Lite             Applications   │
-   │                                          │
-   └──────────────────────────────────────────┘
-          drag the buddy onto the folder
-```
-
-### 3. Open it the first time 🔓
-
-Jaromes Lite is a free, open-source app without a paid Apple certificate, so macOS asks you to confirm once:
-
-1. Open **Applications**, **right-click** Jaromes Lite and choose **Open**.
-2. Click **Open** in the box that appears.
-
-If macOS says the app *"is damaged"*, open **Terminal** and paste this, then try again:
+Open **Terminal** (press <kbd>⌘</kbd> <kbd>Space</kbd>, type *Terminal*, press <kbd>Enter</kbd>), paste this and press <kbd>Enter</kbd>:
 
 ```bash
-xattr -cr "/Applications/Jaromes Lite.app"
+curl -fsSL https://raw.githubusercontent.com/Vanshworkff/jaromes-lite-mac/main/install.sh | bash
 ```
 
-You only do this once. 🎉
+That's it! It picks the right version for your Mac (Apple silicon or Intel), puts **Jaromes Lite** in Applications and opens it. Installed this way, macOS **doesn't block it**, so you never see the *"can't be opened"* box. Run the same line again any time to reinstall.
 
-### 4. Say hi! 👋
+> 🔍 Curious what it does? [Read the installer](install.sh): it only downloads the app from this page's Releases and copies it into Applications.
+
+### Or: download it yourself 📦
+
+<details>
+<summary>Prefer to download the <code>.dmg</code> by hand? Click here.</summary>
+
+1. Go to **[Releases](../../releases/latest)** and download the file for your Mac:
+
+   | Your Mac | Download |
+   |---|---|
+   | M1, M2, M3, M4… (Apple silicon) | `Jaromes-Lite_…_mac-apple-silicon.dmg` |
+   | Older Mac with an Intel chip | `Jaromes-Lite_…_mac-intel.dmg` |
+
+   🤔 Not sure? Click the  Apple menu → **About This Mac**. *Chip: Apple M…* means Apple silicon.
+
+2. Open the `.dmg` and drag **Jaromes Lite** onto the **Applications** folder.
+
+3. Open Jaromes Lite. Because it's a free app without a paid Apple certificate, macOS stops it the first time with *"Apple could not verify…"* or *"can't be opened"*. Click **Done**, then:
+
+   ```
+     System Settings  ▸  Privacy & Security  ▸  scroll down to Security
+        "Jaromes Lite" was blocked …            [ Open Anyway ]   ◀── click
+   ```
+
+   Click **Open Anyway**, enter your Mac password, then **Open**. You only do this once. (On macOS 15 and newer, right-click → Open no longer skips this.)
+
+4. If it says the app *"is damaged"*, open **Terminal**, paste this, and try again:
+
+   ```bash
+   xattr -cr "/Applications/Jaromes Lite.app"
+   ```
+
+</details>
+
+### 2. Say hi! 👋
 
 The setup guide opens by itself. It helps you pick your buddy's look and voice, and sign in to your AI account.
 

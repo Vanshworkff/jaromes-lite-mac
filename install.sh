@@ -29,7 +29,7 @@ URL="$LATEST/Jaromes-Lite_${VERSION}_mac-$KIND.dmg"
 TMP=$(mktemp -d)
 cleanup() { hdiutil detach -quiet "$TMP/mnt" 2>/dev/null || true; rm -rf "$TMP"; }
 trap cleanup EXIT
-echo "Downloading version $VERSION…"
+echo "Downloading version ${VERSION}…"
 curl -fL --retry 3 --progress-bar -o "$TMP/JaromesLite.dmg" "$URL" || fail "The download failed. Try again in a minute."
 mkdir "$TMP/mnt"
 hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$TMP/mnt" "$TMP/JaromesLite.dmg" >/dev/null || fail "Couldn't open the downloaded file."

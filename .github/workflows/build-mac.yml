@@ -1,0 +1,117 @@
+# Builds Jaromes Lite for Mac (Apple silicon and Intel) on GitHub's Mac machines.
+# Run it from the Actions tab ("Run workflow"), or push a version tag (git tag v1.0.1 && git push origin v1.0.1)
+# to publish a GitHub release. A release also carries signed update files and latest.json, which every installed
+# Jaromes Lite checks: it offers "Update to …" in its panel and installs it in one click.
+# Bump "version" in showcase/tauri/src-tauri/tauri.conf.json to match the tag first.
+name: Build Mac app
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            label: apple-silicon
+          - target: x86_64-apple-darwin
+            label: intel
+    runs-on: macos-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: showcase/tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: showcase/tauri/sidecar/package-lock.json
+
+      - name: Install sidecar dependencies
+        working-directory: showcase/tauri/sidecar
+        run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: showcase/tauri/src-tauri -> target
+          key: ${{ matrix.target }}
+
+      - name: Install the Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
+      # No Apple Developer certificate: the app is signed ad-hoc (see the README for opening it the first time).
+      - name: Build
+        env:
+          TAURI_BUNDLES: app,dmg
+          TAURI_BUNDLER_DMG_IGNORE_CI: 'true'
+          APPLE_SIGNING_IDENTITY: '-'
+          # Signs the update files (the public half is plugins.updater.pubkey in tauri.conf.json).
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: ./build.sh release --target ${{ matrix.target }} --config '{"bundle":{"createUpdaterArtifacts":true}}'
+
+      - name: Rename the DMG and update files
+        run: |
+          B=src-tauri/target/${{ matrix.target }}/release/bundle
+          DMG=$(ls $B/dmg/*.dmg | head -1)
+          VER=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          ARCH=$([ "${{ matrix.target }}" = aarch64-apple-darwin ] && echo aarch64 || echo x86_64)
+          mkdir -p out
+          cp "$DMG" "out/Jaromes-Lite_${VER}_mac-${{ matrix.label }}.dmg"
+          cp "$B/macos/Jaromes Lite.app.tar.gz" "out/Jaromes-Lite_${VER}_${ARCH}.app.tar.gz"
+          cp "$B/macos/Jaromes Lite.app.tar.gz.sig" "out/Jaromes-Lite_${VER}_${ARCH}.app.tar.gz.sig"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Jaromes-Lite-mac-${{ matrix.label }}
+          path: showcase/tauri/out/*
+
+      - name: Attach to a GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "Jaromes Lite $GITHUB_REF_NAME (Mac)" --generate-notes || true
+          gh release upload "$GITHUB_REF_NAME" out/* --clobber
+
+  # latest.json: the update feed every installed Jaromes Lite for Mac reads.
+  update-feed:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write latest.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(node -p "require('./showcase/tauri/src-tauri/tauri.conf.json').version")
+          mkdir -p sigs && gh release download "$GITHUB_REF_NAME" -p '*.sig' -D sigs
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          VER="$VER" BASE="$BASE" node -e '
+            const fs = require("fs"), { VER, BASE } = process.env;
+            const platforms = {};
+            for (const arch of ["aarch64", "x86_64"]) {
+              const f = `Jaromes-Lite_${VER}_${arch}.app.tar.gz`;
+              if (fs.existsSync(`sigs/${f}.sig`)) platforms[`darwin-${arch}`] = { signature: fs.readFileSync(`sigs/${f}.sig`, "utf8").trim(), url: `${BASE}/${f}` };
+            }
+            if (!Object.keys(platforms).length) throw new Error("No signed update files on this release");
+            fs.writeFileSync("latest.json", JSON.stringify({ version: VER, notes: `Jaromes Lite ${VER}`, pub_date: new Date().toISOString(), platforms }, null, 2));
+          '
+          cat latest.json
+          gh release upload "$GITHUB_REF_NAME" latest.json --clobber

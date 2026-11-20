@@ -20,15 +20,17 @@ MAJOR=$(sw_vers -productVersion | cut -d. -f1)
 [ "$MAJOR" -ge 14 ] || { MINOR=$(sw_vers -productVersion | cut -d. -f2); [ "$MAJOR" -eq 13 ] && [ "${MINOR:-0}" -ge 5 ]; } || fail "Jaromes Lite needs macOS 13.5 or newer (this Mac has $(sw_vers -productVersion))."
 
 pink "( ◕‿◕ )  Installing Jaromes Lite for your Mac ($KIND)…"
-URL=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep -o "https://[^\"]*_mac-$KIND\.dmg" | head -1 || true)
-[ -n "$URL" ] || fail "Couldn't find the download. Check your internet connection and try again."
-VERSION=$(printf '%s' "$URL" | sed -n 's/.*_\([0-9][0-9.]*\)_mac-.*/\1/p')
+# The newest version, from the update feed (plain download links: no GitHub API, so no rate limit on shared networks).
+LATEST="https://github.com/$REPO/releases/latest/download"
+VERSION=$(curl -fsSL --retry 3 "$LATEST/latest.json" | sed -n 's/.*"version": *"\([0-9][0-9.]*\)".*/\1/p' | head -1 || true)
+[ -n "$VERSION" ] || fail "Couldn't reach GitHub. Check your internet connection and try again."
+URL="$LATEST/Jaromes-Lite_${VERSION}_mac-$KIND.dmg"
 
 TMP=$(mktemp -d)
 cleanup() { hdiutil detach -quiet "$TMP/mnt" 2>/dev/null || true; rm -rf "$TMP"; }
 trap cleanup EXIT
 echo "Downloading version $VERSION…"
-curl -fL --progress-bar -o "$TMP/JaromesLite.dmg" "$URL" || fail "The download failed. Try again in a minute."
+curl -fL --retry 3 --progress-bar -o "$TMP/JaromesLite.dmg" "$URL" || fail "The download failed. Try again in a minute."
 mkdir "$TMP/mnt"
 hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$TMP/mnt" "$TMP/JaromesLite.dmg" >/dev/null || fail "Couldn't open the downloaded file."
 

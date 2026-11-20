@@ -1,0 +1,51 @@
+# Installs Jaromes Lite on a fresh Mac exactly as a new user would (install.sh), then checks it opens and starts.
+# Runs by hand (Actions → Test install → Run workflow), after each release build, and when the installer changes.
+name: Test install
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['Build Mac app']
+    types: [completed]
+  push:
+    branches: [main]
+    paths: ['install.sh', '.github/workflows/test-install.yml']
+
+jobs:
+  mac:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install like a new user would
+        env:
+          JAROMES_NO_LAUNCH: '1'
+        run: cat install.sh | bash
+      - name: Check it isn't blocked and is signed
+        run: |
+          APP="/Applications/Jaromes Lite.app"
+          test -d "$APP"
+          if xattr "$APP" | grep -q com.apple.quarantine; then echo "::error::the app is still marked as downloaded"; exit 1; fi
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          /usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Contents/Info.plist"
+      - name: Check it opens and its brain starts
+        run: |
+          APP="/Applications/Jaromes Lite.app"
+          D="$RUNNER_TEMP/jl"; mkdir -p "$D"
+          echo '{"onboarded":true,"setupVersion":2,"voice":false}' > "$D/sidekick.json"
+          ROAMIES_DATA_DIR="$D" "$APP/Contents/MacOS/roamies" > "$D/out.log" 2>&1 &
+          PID=$!
+          for i in $(seq 1 90); do
+            sleep 1
+            kill -0 $PID 2>/dev/null || break
+            grep -qs ' start ' "$D"/sidekick/logs/*.log && break
+          done
+          if grep -hs ' start ' "$D"/sidekick/logs/*.log; then echo "Jaromes Lite started"; else
+            echo "::error::Jaromes Lite didn't start"; tail -40 "$D/out.log"; tail -40 ~/.gg/sidekick.log 2>/dev/null; exit 1; fi
+          kill -0 $PID || { echo "::error::Jaromes Lite quit by itself"; exit 1; }
+          kill $PID || true
